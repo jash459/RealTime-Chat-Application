@@ -9,13 +9,12 @@ const io = socketio(server)
 io.on('connection', (socket) => {
   console.log('a user connected')
 
-  socket.on('from_client', () => {
-    console.log('event coming form client')
+  socket.on('msg_send', (data) => {
+    console.log(data)
+    // io.emit('msg_rcvd', data)  // using io all client , all client react
+    // socket.emit('msg_rcvd', data)  // now other browser will not react, it is for same client\
+    socket.broadcast.emit('msg_rcvd', data) // except the original one , other client will recieve message
   })
-
-  setInterval(() => {
-    socket.emit('from_server')
-  }, 2000)
 })
 
 app.use('/', express.static(__dirname + '/public'))
