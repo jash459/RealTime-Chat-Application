@@ -1,24 +1,52 @@
-const express = require('express')
-const http = require('http')
-const socketio = require('socket.io')
+const express = require('express');
+const http = require('http');
+const socketio = require('socket.io');
 
-const app = express()
-const server = http.createServer(app)
-const io = socketio(server)
+const connect = require('./config/database-config');
+
+const Chat = require('./models/chat');
+
+const app = express();
+const server = http.createServer(app);
+const io = socketio(server);
 
 io.on('connection', (socket) => {
-  console.log('a user connected')
+    socket.on('join_room', (data) => {
+        console.log("joining a room", data.roomid)
+        socket.join(data.roomid);
+    });
 
-  socket.on('msg_send', (data) => {
-    console.log(data)
-    io.emit('msg_rcvd', data)  // using io all client , all client react
-    // socket.emit('msg_rcvd', data)  // now other browser will not react, it is for same client\
-    // socket.broadcast.emit('msg_rcvd', data) // except the original one , other client will recieve message
-  })
-})
+    socket.on('msg_send', async (data) => {
+        console.log(data);
+        const chat = await Chat.create({
+            roomId: data.roomid,
+            user: data.username,
+            content: data.msg
+        });
+        io.to(data.roomid).emit('msg_rcvd', data);
+    });
 
-app.use('/', express.static(__dirname + '/public'))
+    socket.on('typing', (data) => {
+        socket.broadcast.to(data.roomid).emit('someone_typing');
+    })
+});
+app.set('view engine', 'ejs');
+app.use('/', express.static(__dirname + '/public'));
 
-server.listen(3000, () => {
-  console.log('server started')
-})
+app.get('/chat/:roomid', async (req, res) => {
+    const chats = await Chat.find({
+        roomId: req.params.roomid
+    }).select('content user');
+    console.log(chats);
+    res.render('index', {
+        name: 'Sanket',
+        id: req.params.roomid,
+        chats: chats
+    });
+});
+
+server.listen(3000, async () => {
+    console.log('Server started');
+    await connect();
+    console.log("mongo db connected")
+});
